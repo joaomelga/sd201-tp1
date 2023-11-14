@@ -25,14 +25,16 @@ def precision_recall(expected_results: List[bool], actual_results: List[bool]) -
     TN: float = 0  # true negatives
 
     for expected, actual in zip(expected_results, actual_results):
-        if expected == 1 and actual == 1:
+        if expected == True and actual == True:
             TP += 1
-        elif expected == 0 and actual == 1:
+        elif expected == False and actual == True:
             FN += 1
-        elif expected == 1 and actual == 0:
+        elif expected == True and actual == False:
             FP += 1
-        elif expected == 0 and actual == 0:
+        elif expected == False and actual == False:
             TN += 1
+
+    if (TP == 0): return 0, 0
 
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)
@@ -57,6 +59,9 @@ def F1_score(expected_results: List[bool], actual_results: List[bool]) -> float:
             The F1-score of the predicted results.
     """
     precision, recall = precision_recall(expected_results, actual_results)
+    
+    if (precision == 0 or recall == 0): return 0
+    
     f_measure = (2 * precision * recall) / (precision + recall)
 
     return f_measure

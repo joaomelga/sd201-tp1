@@ -51,16 +51,15 @@ class PointSet:
             The Gini score of the set of points
         """
         true_labels_count = 0
-
-        for label in self.labels:
-            true_labels_count += 1 if label == True else 0
-            
         num_of_labels = len(self.labels)
         
         if not num_of_labels: return 1
+
+        for label in self.labels:
+            true_labels_count += 1 if label == True else 0       
         
         prob_of_true = true_labels_count / num_of_labels
-        prob_of_false = (num_of_labels - true_labels_count) / num_of_labels
+        prob_of_false = 1 - prob_of_true
         
         gini = 1 - (prob_of_true**2 + prob_of_false**2)
         
@@ -79,32 +78,34 @@ class PointSet:
             its features.
         """
         num_of_features = len(self.features[0])
-        features_w_labels = np.column_stack((self.labels, self.features))
-        gini_gains = np.zeros(num_of_features, dtype=float)
+        gini_gains: float = []
         
-        for feature in range(num_of_features):
-            mask_true = features_w_labels[:, feature + 1] == True
-            mask_false = features_w_labels[:, feature + 1] == False
-
-            point_set_1 = PointSet(
-                features = features_w_labels[mask_true][:, -num_of_features:],
-                labels = features_w_labels[mask_true][:, 0],
-                types = self.types
-            )
+        for feature_index in range(num_of_features):
+            feature = self.features[:, feature_index]
+            feature_possible_values = set(feature)
+            gini_split = 0
             
-            point_set_2 = PointSet(
-                features = features_w_labels[mask_false][:, -num_of_features:],
-                labels = features_w_labels[mask_false][:, 0],
-                types = self.types
-            )
+            for value in feature_possible_values:
+                mask_value = (feature == value)
+                features_with_value = self.features[mask_value]
+                labels_for_value = self.labels[mask_value]
+                
+                point_set = PointSet(
+                    features = features_with_value,
+                    labels = labels_for_value,
+                    types = self.types
+                )
+                
+                gini = point_set.get_gini()
+                gini_split += ((len(point_set.labels) / len(self.labels)) * gini)              
 
-            gini_split = (len(point_set_1.labels) * point_set_1.get_gini() + len(point_set_2.labels) * point_set_2.get_gini()) / len(self.labels)
             gini_gain = self.get_gini() - gini_split
-            
-            gini_gains[feature] = gini_gain
+            gini_gains.append(gini_gain)
         
-        best_gini_gain_index = np.argmax(gini_gains)
+        if np.all(gini_gains == 0):
+            return (None, None)
 
+        best_gini_gain_index = np.argmax(gini_gains)
+        
         return (best_gini_gain_index, gini_gains[best_gini_gain_index])
-            
             
