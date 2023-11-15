@@ -78,34 +78,43 @@ class PointSet:
             its features.
         """
         num_of_features = len(self.features[0])
-        gini_gains: float = []
+        splits = []
         
         for feature_index in range(num_of_features):
             feature = self.features[:, feature_index]
             feature_possible_values = set(feature)
-            gini_split = 0
             
             for value in feature_possible_values:
                 mask_value = (feature == value)
-                features_with_value = self.features[mask_value]
-                labels_for_value = self.labels[mask_value]
                 
-                point_set = PointSet(
-                    features = features_with_value,
-                    labels = labels_for_value,
+                point_set_left = PointSet(
+                    features = self.features[mask_value],
+                    labels = self.labels[mask_value],
                     types = self.types
                 )
                 
-                gini = point_set.get_gini()
-                gini_split += ((len(point_set.labels) / len(self.labels)) * gini)              
+                point_set_right = PointSet(
+                    features = self.features[np.logical_not(mask_value)],
+                    labels = self.labels[np.logical_not(mask_value)],
+                    types = self.types
+                )
 
-            gini_gain = self.get_gini() - gini_split
-            gini_gains.append(gini_gain)
+                gini_split = (len(point_set_left.labels) * point_set_left.get_gini() + len(point_set_right.labels) * point_set_right.get_gini()) / len(self.labels)             
+                gini_gain = self.get_gini() - gini_split
+                splits.append([feature_index, value, gini_gain])
         
-        if np.all(gini_gains == 0):
+        all_gini_gains = [row[2] for row in splits]
+
+        if np.all(all_gini_gains == 0):
             return (None, None)
 
-        best_gini_gain_index = np.argmax(gini_gains)
+        best_split_index = np.argmax(all_gini_gains)
         
-        return (best_gini_gain_index, gini_gains[best_gini_gain_index])
+        best_feature_index = splits[best_split_index][0]
+        best_feature_value = splits[best_split_index][1]
+        best_gini_gain = splits[best_split_index][2]
+        
+        self.best_feature_value = best_feature_value
+        
+        return (best_feature_index, best_gini_gain)
             

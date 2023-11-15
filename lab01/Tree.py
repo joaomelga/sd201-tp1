@@ -1,5 +1,6 @@
 from typing import List
 from statistics import mode, mean
+import numpy as np
 
 from PointSet import PointSet, FeaturesTypes
 
@@ -36,35 +37,47 @@ class Tree:
                 The types of the features.
         """
         self.points = PointSet(features, labels, types)
-        self.best_feature_index, _ = self.points.get_best_gain()
-        self.best_feature = self.points.features[:, self.best_feature_index]
-        self.best_feature_possible_values = set(self.best_feature)
         self.h = h
 
+        self.best_feature_index, _ = self.points.get_best_gain()
+        self.best_feature = self.points.features[:, self.best_feature_index]
+        
+        best_feature_value = self.points.best_feature_value
+        best_feature_possible_values = set(self.best_feature)
+
+        self.decision = None
         self.leaves: Leaf = []
         
-        if (h == 0 or set(labels) == 1 or len(labels) == 0 or self.best_feature_index == None): return
+        if (h == 0 or set(labels) == 1 or self.best_feature_index == None): 
+            self.decision = mode(labels)
+            return
 
-        for feature_value in self.best_feature_possible_values:
-            mask_value = self.best_feature == feature_value
-            features_i = self.points.features[mask_value]
-            labels_i = self.points.labels[mask_value]
+        mask_best_value = self.best_feature == best_feature_value
+
+        left_features = self.points.features[mask_best_value]
+        right_features = self.points.features[np.logical_not(mask_best_value)]
         
-            if (len(features_i) != 0 and len(labels_i) != 0): 
-                decision = mode(labels_i)
-
-                self.leaves.append(
-                    Leaf(
-                        feature_value=feature_value,
-                        decision=decision,
-                        tree=Tree(
-                            features=features_i,
-                            labels=labels_i,
-                            types=types,
-                            h=h-1
-                        )
-                    )
+        if len(left_features) != 0:
+            self.leaves.append(Leaf(
+                feature_values=[best_feature_value],
+                tree=Tree(
+                    features=left_features,
+                    labels=self.points.labels[mask_best_value],
+                    types=types,
+                    h=h-1
                 )
+            ))
+            
+        if len(right_features) != 0:
+            self.leaves.append(Leaf(
+                feature_values=[value for value in best_feature_possible_values if value != best_feature_value],
+                tree=Tree(
+                    features=right_features,
+                    labels=self.points.labels[np.logical_not(mask_best_value)],
+                    types=types,
+                    h=h-1
+                )
+            ))
 
     def decide(self, features: List[float]) -> bool:
         """Give the guessed label of the tree to an unlabeled point
@@ -81,16 +94,14 @@ class Tree:
                 guessed by the Tree
         """
         for leaf in self.leaves:
-            if features[self.best_feature_index] == leaf.feature_value:
-                if (len(leaf.tree.leaves) == 0): return leaf.decision
+            if features[self.best_feature_index] in leaf.feature_values:
+                if (leaf.tree.decision != None): return leaf.tree.decision
                 else: return leaf.tree.decide(features)
 
 class Leaf:
     def __init__(self,
-                feature_value: float,
-                decision: bool,
+                feature_values,
                 tree: Tree):
 
-        self.feature_value = feature_value
-        self.decision = decision
+        self.feature_values = feature_values
         self.tree = tree
